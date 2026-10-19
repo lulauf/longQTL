@@ -20,6 +20,7 @@ effect.
 | Baselines | `lq_baselines()`, `lq_sim_benchmark()`, `lq_calibration()` | done: fisher_pooled, lm_mean, wilcoxon_delta, glm_within; gate script in `inst/benchmarks/m0_gate.R` |
 | Read extraction (htslib) | `lq_extract_reads()`, `lq_read_variants()`, `lq_mod_prob()` | done (M1): own MM/ML parser (validated call-by-call against pysam), alleles direct / direct_indel / direct_sv / phased; check script `inst/scripts/m1_check_sample.R` |
 | Single-patient engine | `lq_patient_scan()`, `lq_block_reads()`, `lq_dispersion()` | done (M2): beta-binomial LRT with empirical-Bayes rho, sequential permutation p-values, phasing-free bimodality, CpG-SNP / context flags; simulators `lq_sim_as_reads()`, `lq_sim_person()`; script `inst/scripts/m2_patient_scan.R` |
+| Cohort build | `lq_cohort()`, `lq_reference_blocks()`, `lq_sv_catalogue()`, `lq_cohort_store()`, `lq_cohort_genotypes()`, `lq_stratum_check()` | done (M3): one shared block set from pooled per-sample co-methylation, cohort-wide CpG-SNP masking, SVs merged across samples, read-level store (k, n, strand, HP, PS per read and block; direct read alleles; sample x block summaries), stratum check by permuting people; simulator `lq_sim_cohort_loci()` + `lq_io_sim()`; script `inst/scripts/m3_reference.R` |
 | Cohort scan | — | M4 |
 
 ## Quick start

@@ -107,6 +107,10 @@ print.lq_scenario <- function(x, ...) {
 #'
 #' @param scenario An [lq_sim_scenario()] object.
 #' @param seed Optional seed overriding `scenario$seed`.
+#' @param stratum Optional character vector (one per sample) that fixes the
+#'   technical stratum of every sample, e.g. to keep strata constant across
+#'   loci of one simulated cohort. The random draw still happens, so other
+#'   random numbers do not change.
 #' @return Object of class `lq_sim`, a list of data.tables:
 #'   * `calls`: sample_id, read_id, chr, pos, strand, prob_mod, true_state
 #'   * `reads`: sample_id, read_id, hap (1 maternal / 2 paternal), start, end,
@@ -118,7 +122,7 @@ print.lq_scenario <- function(x, ...) {
 #'   * `samples`: sample_id, stratum, u, v
 #'   and the `scenario`.
 #' @export
-lq_simulate_cohort <- function(scenario, seed = NULL) {
+lq_simulate_cohort <- function(scenario, seed = NULL, stratum = NULL) {
   stopifnot(inherits(scenario, "lq_scenario"))
   sc <- scenario
   set.seed(if (is.null(seed)) sc$seed else seed)
@@ -129,7 +133,14 @@ lq_simulate_cohort <- function(scenario, seed = NULL) {
   sample_id <- sprintf("S%04d", seq_len(S))
 
   # ---- samples ----------------------------------------------------------------
+  fixed_stratum <- stratum
   stratum <- sample(names(sc$strata), S, replace = TRUE, prob = sc$strata)
+  if (!is.null(fixed_stratum)) {
+    if (length(fixed_stratum) != S || !all(fixed_stratum %in% names(sc$strata))) {
+      stop("stratum must have one entry per sample, each one of names(scenario$strata).")
+    }
+    stratum <- as.character(fixed_stratum)
+  }
   samples <- data.table::data.table(sample_id = sample_id, stratum = stratum,
                                     u = stats::rnorm(S, 0, sc$sigma_u),
                                     v = stats::rnorm(S, 0, sc$tau))
@@ -316,4 +327,72 @@ print.lq_sim <- function(x, ...) {
     cat("  causal", cv, "genotypes 0/1/2:", paste(g, collapse = "/"), "\n")
   }
   invisible(x)
+}
+
+
+#' Simulate a cohort over many loci
+#'
+#' Every locus is an independent [lq_simulate_cohort()] draw for the same
+#' `n_samples` people, placed `spacing` bp apart on one chromosome. Technical
+#' strata are drawn once per person and kept across loci. The result plugs
+#' into the cohort functions through [lq_io_sim()], so reference blocks and
+#' the read-level store can be tested against known truth without BAM files.
+#'
+#' @param scenarios A list of [lq_sim_scenario()] objects (one per locus) or
+#'   one scenario recycled `n_loci` times.
+#' @param n_loci Number of loci if `scenarios` is a single scenario.
+#' @param n_samples People in the cohort (overrides the scenarios).
+#' @param seed Base seed; locus `i` uses `seed + i`.
+#' @param spacing Distance between loci in bp.
+#' @return Object of class `lq_sim_loci`: `samples` (sample_id, stratum),
+#'   `reads` (named list of one `lq_reads` object per sample), `truth` (one
+#'   row per locus).
+#' @export
+lq_sim_cohort_loci <- function(scenarios, n_loci = 20L, n_samples = 10L, seed = 1L,
+                               spacing = 1e5) {
+  if (inherits(scenarios, "lq_scenario")) scenarios <- rep(list(scenarios), n_loci)
+  set.seed(seed)
+  st <- scenarios[[1]]$strata
+  sid <- sprintf("S%04d", seq_len(n_samples))
+  strata <- sample(names(st), n_samples, replace = TRUE, prob = st)
+  
+  per_locus <- lapply(seq_along(scenarios), function(i) {
+    sc <- scenarios[[i]]
+    sc$n_samples <- as.integer(n_samples)
+    sc$block_start <- 1e6 + (i - 1) * spacing
+    sc$chr <- "chrSim"
+    sim <- lq_simulate_cohort(sc, seed = seed + i, stratum = strata)
+    cv <- sim$variants[is_causal == TRUE, variant_id]
+    list(sim = sim,
+         truth = data.table::data.table(
+           locus = i, block_start = sc$block_start,
+           block_end = sc$block_start + (sc$n_cpg - 1L) * sc$cpg_spacing,
+           causal = if (length(cv)) cv else NA_character_, beta_W = sc$beta_W,
+           beta_B = sc$beta_B, imprint = sc$imprint, base_meth = sc$base_meth))
+  })
+  
+  reads <- lapply(sid, function(s) {
+    parts <- lapply(seq_along(per_locus), function(i) {
+      x <- lq_sim_as_reads(per_locus[[i]]$sim, s)
+      pre <- paste0(s, ":L", i, "_")
+      x$reads[, read_id := paste0(pre, read_id)]
+      x$calls[, read_id := paste0(pre, read_id)]
+      x$read_alleles[, read_id := paste0(pre, read_id)]
+      x
+    })
+    out <- structure(list(
+      reads = data.table::rbindlist(lapply(parts, `[[`, "reads")),
+      calls = data.table::rbindlist(lapply(parts, `[[`, "calls")),
+      read_alleles = data.table::rbindlist(lapply(parts, `[[`, "read_alleles")),
+      variants = data.table::rbindlist(lapply(parts, `[[`, "variants")),
+      region = "chrSim", qc = list()), class = "lq_reads")
+    out$reads[, sample_id := s]
+    out$calls[, sample_id := s]
+    out
+  })
+  names(reads) <- sid
+  structure(list(samples = data.table::data.table(sample_id = sid, stratum = strata),
+                 reads = reads,
+                 truth = data.table::rbindlist(lapply(per_locus, `[[`, "truth"))),
+            class = "lq_sim_loci")
 }

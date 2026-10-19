@@ -341,6 +341,7 @@ print.lq_patient <- function(x, ...) {
 .cpg_snp_sites <- function(calls, het) {
   hs <- het[class == "small"]
   if (!nrow(hs) || !nrow(calls)) return(data.table::data.table(chr = character(), pos = integer()))
+  if (!"end" %in% names(hs)) hs[, end := pos + pmax(nchar(ref), 1L) - 1L]
   cp <- unique(calls[, .(chr, pos)])
   cp[, `:=`(c_start = pos, c_end = pos + 1L)]
   hv <- hs[, .(chr, s = as.integer(pos), e = as.integer(pmax(end, pos)))]

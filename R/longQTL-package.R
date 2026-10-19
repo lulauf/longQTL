@@ -36,5 +36,9 @@ utils::globalVariables(c(
   "spans", "bin", "mu", "rho_hat", "mu_c", "lr", "dist", "n_0", "n_1", "meth_0",
   "meth_1", "p_final", "p_lrt", "p_perm", "q", "perm_confirmed", "unit_type",
   "n_hp1", "n_hp2", "hap_balance_p", "c_start", "c_end", "in_cpg", "cpg_snp",
-  "context_snp", "known_region", "name", "x.N", "unit_id", "asm_call", "delta"
+  "context_snp", "known_region", "name", "x.N", "unit_id", "asm_call", "delta",
+  "n_cpg_masked", "valid", "r2w", "w", "ns", "n_samples", "n_samples_r2", "c_s", "c_e",
+  "i.N", "mean_meth", "median_samples", "mean_depth", "cluster", "len", "orig_id",
+  "meth", "n_carriers", "class", "r_start", "multiallelic", "block_start_idx",
+  "cohort_masked", "n_ref", "n_alt", "f", "v_start"
 ))

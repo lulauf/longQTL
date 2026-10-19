@@ -96,7 +96,7 @@ lq_block_seed <- function(block_id, seed) {
 #'
 #' @param chunks Output of [lq_plan_chunks()].
 #' @param worker Function `function(chunk, params, ...)` returning a
-#'   data.frame (or NULL). It receives one chunk row (a one-row data.table).
+#'   data.frame, NULL or any other R object (stored as is). It receives one chunk row (a one-row data.table).
 #' @param params [lq_params()] object, passed to the worker.
 #' @param out_dir Directory for per-chunk results (`<chunk_id>.rds`) and the
 #'   manifest. Existing results are reused, so an interrupted run resumes.
@@ -135,7 +135,7 @@ lq_run_chunks <- function(chunks, worker, params, out_dir,
     saveRDS(res, tmp)
     file.rename(tmp, f)
     data.table::data.table(chunk_id = ch$chunk_id, status = "done", seconds = dt,
-                           n_rows = if (is.null(res)) 0L else nrow(res),
+                           n_rows = if (is.null(res)) 0L else if (is.data.frame(res)) nrow(res) else NA_integer_,
                            error = NA_character_)
   }
 

@@ -173,34 +173,52 @@ lq_pair_comethylation <- function(calls, max_lag = 5L) {
 
 .blocks_comethyl <- function(calls, a) {
   ps <- .pair_stats(calls, a$max_lag)
-
-  # pair linkage: 1 linked, 0 broken, -1 unobserved
-  ps[, link := {
-    observed  <- n_pair >= a$min_pair_reads
-    # r^2 carries no information when both CpGs are (nearly) constant: one
-    # miscalled read then drives it to ~0. Such pairs are linked when their
-    # levels agree.
-    invariant <- observed & pmin(p_a, 1 - p_a) < a$invariant_maf &
-      pmin(p_b, 1 - p_b) < a$invariant_maf
-    lk <- data.table::fifelse(!observed, -1L,
-            data.table::fifelse(!is.na(r2) & r2 >= a$r2_min, 1L, 0L))
-    if (isTRUE(a$merge_invariant)) {
-      lk[invariant & abs(p_a - p_b) <= a$invariant_tol] <- 1L
-    }
-    lk
-  }]
-
+  ps[, link := .link_pairs(n_pair, p_a, p_b, r2, a)]
   cpg_all <- unique(calls[, .(chr, pos = as.integer(pos))])
-  data.table::setorder(cpg_all, chr, pos)
+  .segment_cpgs(cpg_all, ps, a)
+}
 
+# Pair linkage from (pooled) pair statistics: 1 linked, 0 broken,
+# -1 unobserved. r^2 carries no information when both CpGs are (nearly)
+# constant: one miscalled read then drives it to ~0. Such pairs are linked
+# when their levels agree.
+.link_pairs <- function(n_pair, p_a, p_b, r2, a) {
+  observed  <- n_pair >= a$min_pair_reads
+  invariant <- observed & pmin(p_a, 1 - p_a) < a$invariant_maf &
+    pmin(p_b, 1 - p_b) < a$invariant_maf
+  lk <- data.table::fifelse(!observed, -1L,
+                            data.table::fifelse(!is.na(r2) & r2 >= a$r2_min, 1L, 0L))
+  if (isTRUE(a$merge_invariant)) {
+    lk[invariant & abs(p_a - p_b) <= a$invariant_tol] <- 1L
+  }
+  lk
+}
+
+# Segment CpGs into blocks given pair links. `cpg_all`: chr, pos of every
+# CpG to place; `ps`: chr, cpg_a, cpg_b, link. The lag of a pair is taken
+# from the order of `cpg_all`, so pairs observed with a different lag (e.g.
+# pooled over samples that miss a CpG) are placed correctly; pairs farther
+# apart than max_lag CpGs are ignored.
+.segment_cpgs <- function(cpg_all, ps, a) {
+  cpg_all <- unique(data.table::as.data.table(cpg_all)[, .(chr, pos = as.integer(pos))])
+  data.table::setorder(cpg_all, chr, pos)
+  if (!nrow(cpg_all)) {
+    return(list(blocks = data.table::data.table(block_id = character(), chr = character(),
+                                                start = integer(), end = integer(), n_cpg = integer()),
+                cpg_map = data.table::data.table(chr = character(), pos = integer(), block_id = character())))
+  }
+  
   maps <- lapply(split(cpg_all, by = "chr", keep.by = TRUE), function(cc) {
     n <- nrow(cc)
     link <- rep(-1L, n * a$max_lag)
     pp <- ps[chr == cc$chr[1L]]
     if (nrow(pp)) {
       ia <- match(pp$cpg_a, cc$pos)
-      cell <- (ia - 1L) * a$max_lag + pp$lag
-      link[cell] <- pp$link
+      ib <- match(pp$cpg_b, cc$pos)
+      lg <- ib - ia
+      ok <- !is.na(lg) & lg >= 1L & lg <= a$max_lag
+      cell <- (ia[ok] - 1L) * a$max_lag + lg[ok]
+      link[cell] <- pp$link[ok]
     }
     bs <- segment_blocks_cpp(cc$pos, link, as.integer(a$max_lag), as.integer(a$max_gap),
                              as.integer(a$max_cpgs), as.integer(a$max_bp))
@@ -208,7 +226,7 @@ lq_pair_comethylation <- function(calls, max_lag = 5L) {
     cc
   })
   cpg_map <- data.table::rbindlist(maps)
-
+  
   cpg_map[, n_cpg := .N, by = .(chr, block_start_idx)]
   small <- cpg_map$n_cpg < a$min_cpgs
   if (any(small)) {

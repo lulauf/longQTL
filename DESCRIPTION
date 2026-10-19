@@ -1,0 +1,39 @@
+Package: longQTL
+Type: Package
+Title: Read-Level Methylation QTL Mapping from Long-Read Sequencing
+Version: 0.0.1
+Authors@R: person("Lukas", "Laufer", email = "lukas.laufer@uni-saarland.de",
+    role = c("aut", "cre"))
+Description: Maps cis methylation quantitative trait loci (mQTL) from Oxford
+    Nanopore long reads at the level of single molecules. Each read carries
+    both its allele and its CpG methylation calls; longQTL models these
+    jointly with beta-binomial generalized linear mixed models that separate
+    the within-individual (allele-specific) from the between-individual
+    (dosage) genetic effect. Supports cohort-scale scans with
+    permutation-calibrated block-level significance and a single-patient
+    mode that compares one individual against a reference panel.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Depends:
+    R (>= 4.2)
+Imports:
+    data.table,
+    Rcpp,
+    stats,
+    utils,
+    parallel
+LinkingTo:
+    Rcpp,
+    Rhtslib
+Suggests:
+    testthat (>= 3.0.0),
+    withr,
+    future.apply,
+    arrow,
+    glmmTMB,
+    lme4
+Config/testthat/edition: 3
+SystemRequirements: C++17, GNU make; samtools (optional, for
+    lq_bam_provenance); tabix (optional, fast VCF region access)

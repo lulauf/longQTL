@@ -22,7 +22,8 @@ Imports:
     Rcpp,
     stats,
     utils,
-    parallel
+    parallel,
+    grDevices
 LinkingTo:
     Rcpp,
     Rhtslib
@@ -32,7 +33,10 @@ Suggests:
     future.apply,
     arrow,
     glmmTMB,
-    lme4
+        lme4,
+    ggplot2,
+    patchwork,
+    ggrepel
 Config/testthat/edition: 3
 SystemRequirements: C++17, GNU make; samtools (optional, for
     lq_bam_provenance); tabix (optional, fast VCF region access)

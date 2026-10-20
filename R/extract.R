@@ -116,6 +116,12 @@ lq_extract_reads <- function(bam, region, small_variants = NULL, sv = NULL,
     if (nrow(sv_ok)) sv_ok[, .(variant_id, chr, pos, end, ref, alt, gt, gt_hp1, gt_hp2,
                                phased, ps, class = "sv", svtype, svlen, support)]
   ), use.names = TRUE, fill = TRUE)
+    if (!nrow(variants)) {
+      variants <- data.table::data.table(variant_id = character(), chr = character(), pos = integer(),
+                                       end = integer(), ref = character(), alt = character(),
+                                       gt = character(), gt_hp1 = integer(), gt_hp2 = integer(),
+                                       phased = logical(), ps = integer(), class = character())
+    }
 
   qc <- c(raw$qc, list(
     n_reads = nrow(reads), n_calls = nrow(calls),

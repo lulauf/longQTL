@@ -168,6 +168,7 @@ lq_run_chunks <- function(chunks, worker, params, out_dir,
 #' @return data.table of all chunk results row-bound.
 #' @export
 lq_collect <- function(out_dir) {
-  files <- list.files(out_dir, pattern = "^chunk_.*\\.rds$", full.names = TRUE)
+  # every per-chunk result (chunk ids from lq_plan_chunks or lq_cohort_windows)
+  files <- list.files(out_dir, pattern = "\\.rds$", full.names = TRUE)
   data.table::rbindlist(lapply(files, readRDS), use.names = TRUE, fill = TRUE)
 }
